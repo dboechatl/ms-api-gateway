@@ -1,5 +1,7 @@
-const express = require("express");
+import express from "express";
+import { UserDTO } from "./user.dto";
 import { RabbitMQ } from "./rabbitmq";
+import { db } from "./database";
 
 const app = express();
 const rabbitMQ = new RabbitMQ();
@@ -13,8 +15,10 @@ app.post("/user", async (req, res) => {
         return res.status(400).json({ error: "Name and email are required" });
     }
 
+    const userDTO = new UserDTO(name, email);
+
     try {
-        await rabbitMQ.publish("user-queue", JSON.stringify({ name, email }));
+        await rabbitMQ.publish("user-queue", JSON.stringify(userDTO));
         res.status(200).json({ message: "User creation request sent" });
     } catch (error) {
         res.status(500).json({ error: "Failed to send message to RabbitMQ" });
@@ -23,23 +27,32 @@ app.post("/user", async (req, res) => {
 
 app.get("/users", async (req, res) => {
     try {
-        const message = JSON.stringify({ action: "get-all-users" });
-        await rabbitMQ.publish("user-queue", message);
-        res.status(200).json({ message: "User retrieval request sent for all users" });
+        const [users] = await db.query("SELECT * FROM users", []);
+        res.status(200).json(users);
     } catch (error) {
-        res.status(500).json({ error: "Failed to send message to RabbitMQ" });
+        console.error("Erro ao buscar usuários:", error);
+        res.status(500).json({ error: "Failed to retrieve users from the database" });
     }
 });
 
 (async () => {
     const rabbitMQUrl = "amqp://guest:guest@localhost:5672";
+    const PORT = process.env.PORT || 8080;
+    const HOST = process.env.HOST || "localhost";
+
     try {
         console.log(`Attempting to connect to RabbitMQ at ${rabbitMQUrl}...`);
+        await db.connect(); // 👉 conectando ao banco antes de tudo
+        console.log("Connected to MySQL");
+
         await rabbitMQ.connect(rabbitMQUrl);
         console.log(`Connected to RabbitMQ at ${rabbitMQUrl}`);
-        app.listen(3000, () => console.log("API Gateway running on port 3000"));
+
+        app.listen(PORT, HOST, () =>
+            console.log(`API Gateway running at http://${HOST}:${PORT}`)
+        );
     } catch (error) {
-        console.error("Failed to connect to RabbitMQ:", error);
+        console.error("Initialization failed:", error);
         process.exit(1);
     }
 })();
