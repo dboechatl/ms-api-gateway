@@ -18,7 +18,11 @@ app.post("/user", async (req, res) => {
     const userDTO = new UserDTO(name, email);
 
     try {
-        await rabbitMQ.publish("user-queue", JSON.stringify(userDTO));
+        // Publish a message with user details to RabbitMQ
+        await rabbitMQ.publish("user-queue", JSON.stringify({
+            action: "USER_CREATED",
+            data: userDTO
+        }));
         res.status(200).json({ message: "User creation request sent" });
     } catch (error) {
         res.status(500).json({ error: "Failed to send message to RabbitMQ" });
