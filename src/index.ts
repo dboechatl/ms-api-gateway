@@ -1,6 +1,5 @@
 import app from "./app";
 import { UserController } from "./controllers/user.controller";
-import { db } from "./services/database.service";
 import { RabbitMQService } from "./services/rabbitmq.service";
 
 const rabbitMQ = new RabbitMQService();
@@ -11,15 +10,14 @@ const HOST = process.env.HOST || "localhost";
 (async () => {
     try {
         console.log("Initializing services...");
-        await db.connect();
-        await rabbitMQ.connect(rabbitMQUrl);
+        await rabbitMQ.connect(rabbitMQUrl); // Conecta ao RabbitMQ
 
         // Inicializa o UserController com a instância conectada
         UserController.initialize(rabbitMQ);
 
-        // Passa a instância conectada para o controller (se necessário)
+        // Inicia o servidor Express
         app.listen(PORT, HOST, () =>
-            console.log(`API Gateway running at http://localhost:8080`)
+            console.log(`API Gateway running at http://${HOST}:${PORT}`)
         );
     } catch (error) {
         console.error("Initialization failed:", error);
